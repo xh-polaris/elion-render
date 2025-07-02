@@ -16,7 +16,7 @@ WORKDIR /app
 COPY requirements.txt .
 
 # 安装 Python 依赖（自动使用上述镜像源）
-RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install --no-cache-dir -r requirements.txt  -i  http://mirrors.cloud.tencent.com/pypi/simple --trusted-host mirrors.cloud.tencent.com
 
 # 复制应用代码
 COPY . .
