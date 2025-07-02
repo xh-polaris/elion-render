@@ -5,9 +5,6 @@ FROM python:3.12-slim
 ENV TZ=Asia/Shanghai
 RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
 
-# 仅配置 pip 镜像源（阿里云）
-RUN pip config set global.index-url https://mirrors.cloud.tencent.com/pypi/simple
-RUN pip config set global.trusted-host mirrors.cloud.tencent.com
 
 # 设置工作目录
 WORKDIR /app
@@ -16,7 +13,7 @@ WORKDIR /app
 COPY requirements.txt .
 
 # 安装 Python 依赖（自动使用上述镜像源）
-RUN pip install --no-cache-dir -r requirements.txt  -i  https://mirrors.cloud.tencent.com/pypi/simple --trusted-host mirrors.cloud.tencent.com
+RUN pip install --no-cache-dir -r requirements.txt
 
 # 复制应用代码
 COPY . .
