@@ -9,9 +9,18 @@ RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
 # 设置工作目录
 WORKDIR /app
 
-# 先复制依赖文件（利用 Docker 缓存层）
-COPY requirements.txt .
+# 安装系统编译依赖（解决 reportlab 编译问题）
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+    gcc \
+    python3-dev \
+    libfreetype6-dev \
+    pkg-config \
+    && rm -rf /var/lib/apt/lists/*
 
+# 先复制依赖文件
+COPY requirements.txt .
+RUN pip install --upgrade pip
 # 安装 Python 依赖（自动使用上述镜像源）
 RUN pip install --no-cache-dir -r requirements.txt
 
