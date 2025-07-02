@@ -3,5 +3,5 @@ flask_cors==6.0.0
 lxml==5.3.0
 Pillow==11.2.1
 reportlab==3.6.13
-Requests==2.32.2
+Requests==2.32.4
 gunicorn==23.0.0
