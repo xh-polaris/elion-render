@@ -1,0 +1,28 @@
+# 使用官方 Python 基础镜像
+FROM python:3.12-slim
+
+# 设置时区
+ENV TZ=Asia/Shanghai
+RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
+
+# 设置工作目录
+WORKDIR /app
+
+# 先复制依赖文件（利用 Docker 缓存层）
+COPY requirements.txt .
+
+# 安装 Python 依赖
+RUN pip install --no-cache-dir -r requirements.txt
+
+# 复制应用代码
+COPY . .
+
+# 暴露端口（与 Flask 配置一致）
+EXPOSE 5000
+
+# 生产环境启动命令（Gunicorn）
+CMD ["gunicorn", \
+    "--bind", "0.0.0.0:5000", \
+    "--workers", "2", \
+    "--threads", "2", \
+    "app:create_app()"]

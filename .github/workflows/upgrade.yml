@@ -1,0 +1,84 @@
+name: Upgrade
+on:
+  push:
+    # Publish semver tags as releases.
+    branches: [ "main" ]
+
+env:
+  REGISTRY: docker.io
+  USERNAME: xhpolaris
+  IMAGE_NAME: elion-render
+  WORKLOAD_TYPE: deployment
+
+# Allow one concurrent deployment
+concurrency:
+  group: "upgrade"
+  cancel-in-progress: true
+
+jobs:
+  env:
+    runs-on: elion-runners
+    outputs:
+      VAR_KUBE_VERSION: ${{ steps.env.outputs.VAR_KUBE_VERSION }}
+      SECRET_DOCKERHUB_ACCESS_TOKEN: ${{ steps.env.outputs.SECRET_DOCKERHUB_ACCESS_TOKEN }}
+    steps:
+      - id: env
+        run: |
+          echo "VAR_KUBE_VERSION=$VAR_KUBE_VERSION" >> "$GITHUB_OUTPUT"
+          echo "SECRET_DOCKERHUB_ACCESS_TOKEN=$SECRET_DOCKERHUB_ACCESS_TOKEN" >> "$GITHUB_OUTPUT"
+  build:
+    runs-on: elion-runners
+    needs: env
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Bump Version
+        id: version
+        run: curl -s https://raw.githubusercontent.com/xh-polaris/chore/main/bump_version.sh | bash -s -- ${{ env.USERNAME }}/${{ env.IMAGE_NAME }}
+
+      # Login against a Docker registry except on PR
+      # https://github.com/docker/login-action
+      - name: Log into registry ${{ env.REGISTRY }}
+        if: github.event_name == 'push'
+        uses: docker/login-action@28218f9b04b4f3f62068d7b6ce6ca5b26e35336c
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ env.USERNAME }}
+          password: ${{ needs.env.outputs.SECRET_DOCKERHUB_ACCESS_TOKEN }}
+
+      # Extract metadata (tags, labels) for Docker
+      # https://github.com/docker/metadata-action
+      - name: Extract Docker metadata
+        id: meta
+        uses: docker/metadata-action@98669ae865ea3cffbcbaa878cf57c20bbf1c6c38
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.USERNAME }}/${{ env.IMAGE_NAME }}
+
+      # Build and push Docker image with Buildx (don't push on PR)
+      # https://github.com/docker/build-push-action
+      - name: Build and push Docker image
+        uses: docker/build-push-action@ac9327eae2b366085ac7f6a2d02df8aa8ead720a
+        with:
+          context: .
+          push: ${{ github.event_name == 'push' }}
+          tags: ${{ env.REGISTRY }}/${{ env.USERNAME }}/${{ env.IMAGE_NAME }}:${{ steps.version.outputs.version }}
+          labels: ${{ steps.meta.outputs.labels }}
+
+  deploy:
+    runs-on: elion-runners
+    needs: [build,env]
+    if: github.event_name == 'push'
+    steps:
+      - name: Setup Kubectl
+        uses: azure/setup-kubectl@v3
+        with:
+          version: ${{ needs.env.outputs.VAR_KUBE_VERSION }}
+
+      - name: Deploy
+        run: |
+          mkdir $HOME/.kube
+          echo "$SECRET_KUBE_CONFIG" > $HOME/.kube/config
+          kubectl set image ${{ env.WORKLOAD_TYPE }}/${{ env.IMAGE_NAME }} ${{ env.IMAGE_NAME }}=${{ env.USERNAME }}/${{ env.IMAGE_NAME }}:${{ needs.build.outputs.version }} -n $VAR_BASE_TEST_NAMESPACE
